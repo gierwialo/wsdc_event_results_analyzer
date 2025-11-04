@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Inject Analytics Code
-        if: ${{ secrets.ANALYTICS_CODE != '' }}
+        if: secrets.ANALYTICS_CODE != ''
         env:
           ANALYTICS_CODE: ${{ secrets.ANALYTICS_CODE }}
         run: |
