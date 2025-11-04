@@ -418,7 +418,7 @@ const calculateRPSS = (results, judges) => {
     return rpssResult;
 };
 
-const mapCalculatedPlaces = (results, rpssResult) => {
+const mapCalculatedPlaces = (results, rpssResult, hasModifications = false) => {
     const calcPlaceMap = {};
     rpssResult.placements.forEach(p => {
         calcPlaceMap[p.couple_id] = {
@@ -450,13 +450,62 @@ const mapCalculatedPlaces = (results, rpssResult) => {
             result.calculatedPlace = '?';
             result.calcDetails = 'error';
         }
+
+        // Add computed values for performance
+        updateResultComputedValues(result, hasModifications);
     });
+};
+
+// Update computed values for a result object (performance optimization)
+const updateResultComputedValues = (result, hasModifications) => {
+    // Row class
+    if (hasModifications) {
+        if (result.calculatedPlace < result.place) {
+            result._rowClass = 'row-improved';
+        } else if (result.calculatedPlace > result.place) {
+            result._rowClass = 'row-worsened';
+        } else {
+            result._rowClass = '';
+        }
+    } else {
+        result._rowClass = '';
+    }
+
+    // Place class
+    if (!result.calculatedPlace) {
+        result._placeClass = '';
+    } else if (hasModifications) {
+        if (result.calculatedPlace < result.place) {
+            result._placeClass = 'place-improved';
+        } else if (result.calculatedPlace > result.place) {
+            result._placeClass = 'place-worsened';
+        } else {
+            result._placeClass = result.calculatedPlace === result.place ? 'place-match' : 'place-mismatch';
+        }
+    } else {
+        result._placeClass = result.calculatedPlace === result.place ? 'place-match' : 'place-mismatch';
+    }
+
+    // Place title
+    if (!result.calculatedPlace) {
+        result._placeTitle = '';
+    } else if (hasModifications) {
+        if (result.calculatedPlace < result.place) {
+            result._placeTitle = 'Improved (moved up)';
+        } else if (result.calculatedPlace > result.place) {
+            result._placeTitle = 'Worsened (moved down)';
+        } else {
+            result._placeTitle = result.calculatedPlace === result.place ? 'Match' : 'Mismatch';
+        }
+    } else {
+        result._placeTitle = result.calculatedPlace === result.place ? 'Match' : 'Mismatch';
+    }
 };
 
 // Alpine.js data
 document.addEventListener('alpine:init', () => {
     Alpine.data('resultsAnalyzer', () => ({
-        url: '',
+        url: localStorage.getItem('wsdc_last_url') || '',
         loading: false,
         error: '',
         successMessage: '',
@@ -473,43 +522,12 @@ document.addEventListener('alpine:init', () => {
         currentOrdinals: null,       // Current (possibly modified) ordinals [judge][couple]
         modifiedCells: new Set(),    // Track which cells are modified "judgeIdx-coupleIdx"
         hasModifications: false,     // Flag if any modifications exist
-
-        // Computed property for place matching class
-        getPlaceClass(result) {
-            if (!result.calculatedPlace) return '';
-
-            // If modifications exist, compare with original place
-            if (this.hasModifications) {
-                if (result.calculatedPlace < result.place) return 'place-improved';
-                if (result.calculatedPlace > result.place) return 'place-worsened';
-            }
-
-            return result.calculatedPlace === result.place ? 'place-match' : 'place-mismatch';
-        },
-
-        // Computed property for place match title
-        getPlaceTitle(result) {
-            if (!result.calculatedPlace) return '';
-
-            if (this.hasModifications) {
-                if (result.calculatedPlace < result.place) return 'Improved (moved up)';
-                if (result.calculatedPlace > result.place) return 'Worsened (moved down)';
-            }
-
-            return result.calculatedPlace === result.place ? 'Match' : 'Mismatch';
-        },
+        advancedMode: false,         // Advanced mode: no smart swap, manual validation
+        invalidJudges: new Set(),    // Track judge indices with validation errors
 
         // Check if cell is modified
         isModified(judgeIdx, coupleIdx) {
             return this.modifiedCells.has(`${judgeIdx}-${coupleIdx}`);
-        },
-
-        // Get row class for highlighting
-        getRowClass(result) {
-            if (!this.hasModifications) return '';
-            if (result.calculatedPlace < result.place) return 'row-improved';
-            if (result.calculatedPlace > result.place) return 'row-worsened';
-            return '';
         },
 
         // Get current score for judge and couple
@@ -518,33 +536,97 @@ document.addEventListener('alpine:init', () => {
             return this.currentOrdinals[judgeIdx]?.[coupleIdx] || '-';
         },
 
-        // Handle score change with smart swap
+        // Check if judge column has validation errors
+        isJudgeInvalid(judgeIdx) {
+            return this.invalidJudges.has(judgeIdx);
+        },
+
+        // Toggle advanced mode
+        toggleAdvancedMode() {
+            this.advancedMode = !this.advancedMode;
+            this.error = null; // Clear any validation errors when switching modes
+            this.invalidJudges.clear(); // Clear invalid judge highlights
+        },
+
+        // Handle score change with smart swap (or manual in advanced mode)
         handleScoreChange(judgeIdx, coupleIdx, event) {
             const newValue = parseInt(event.target.value);
             const oldValue = this.currentOrdinals[judgeIdx][coupleIdx];
 
             if (isNaN(newValue) || newValue === oldValue) return;
 
-            // Find couple that currently has newValue
-            const swapCoupleIdx = this.currentOrdinals[judgeIdx].findIndex(
-                (score, idx) => score === newValue && idx !== coupleIdx
-            );
-
-            if (swapCoupleIdx !== -1) {
-                // Swap: current couple gets newValue, other gets oldValue
+            if (this.advancedMode) {
+                // Advanced mode: just update the value, no smart swap
                 this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
-                this.currentOrdinals[judgeIdx][swapCoupleIdx] = oldValue;
-
-                // Mark both as modified
                 this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
-                this.modifiedCells.add(`${judgeIdx}-${swapCoupleIdx}`);
             } else {
-                // Just update (shouldn't happen with proper validation)
-                this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
-                this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
+                // Simple mode: smart swap
+                // Find couple that currently has newValue
+                const swapCoupleIdx = this.currentOrdinals[judgeIdx].findIndex(
+                    (score, idx) => score === newValue && idx !== coupleIdx
+                );
+
+                if (swapCoupleIdx !== -1) {
+                    // Swap: current couple gets newValue, other gets oldValue
+                    this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
+                    this.currentOrdinals[judgeIdx][swapCoupleIdx] = oldValue;
+
+                    // Mark both as modified
+                    this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
+                    this.modifiedCells.add(`${judgeIdx}-${swapCoupleIdx}`);
+                } else {
+                    // Just update (shouldn't happen with proper validation)
+                    this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
+                    this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
+                }
             }
 
             this.hasModifications = true;
+        },
+
+        // Validate ordinals (each judge must have unique values 1..C)
+        validateOrdinals() {
+            const C = this.results.length;
+            const J = this.judges.length;
+            const invalidJudgeIndices = [];
+            const errors = [];
+
+            for (let j = 0; j < J; j++) {
+                const judgeOrdinals = this.currentOrdinals[j];
+                const values = new Set(judgeOrdinals);
+                let judgeHasError = false;
+
+                // Check if we have exactly C unique values
+                if (values.size !== C) {
+                    errors.push(`Judge ${this.judges[j]}: Found ${values.size} unique values, expected ${C}`);
+                    judgeHasError = true;
+                }
+
+                // Check if all values are in range 1..C
+                if (!judgeHasError) {
+                    for (let i = 1; i <= C; i++) {
+                        if (!judgeOrdinals.includes(i)) {
+                            errors.push(`Judge ${this.judges[j]}: Missing value ${i}`);
+                            judgeHasError = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (judgeHasError) {
+                    invalidJudgeIndices.push(j);
+                }
+            }
+
+            if (invalidJudgeIndices.length > 0) {
+                return {
+                    valid: false,
+                    message: errors.join('; '),
+                    invalidJudges: invalidJudgeIndices
+                };
+            }
+
+            return { valid: true, invalidJudges: [] };
         },
 
         // Recalculate RPSS with current ordinals
@@ -552,7 +634,22 @@ document.addEventListener('alpine:init', () => {
             if (!force && !this.hasModifications) return;
 
             try {
+                // Validate ordinals if in advanced mode
+                if (this.advancedMode) {
+                    const validation = this.validateOrdinals();
+                    if (!validation.valid) {
+                        this.error = 'Invalid ordinals: ' + validation.message;
+                        // Mark invalid judge columns
+                        this.invalidJudges.clear();
+                        validation.invalidJudges.forEach(j => this.invalidJudges.add(j));
+                        return;
+                    }
+                    // Clear invalid judges on successful validation
+                    this.invalidJudges.clear();
+                }
+
                 this.calculatingRPSS = true;
+                this.error = null; // Clear any previous errors
                 await new Promise(resolve => setTimeout(resolve, 50));
 
                 // Build couple_ids from results in original order (by originalIndex)
@@ -569,36 +666,8 @@ document.addEventListener('alpine:init', () => {
                     this.judges
                 );
 
-                // Map new calculated places
-                const calcPlaceMap = {};
-                rpssResult.placements.forEach(p => {
-                    calcPlaceMap[p.couple_id] = {
-                        place: p.place,
-                        k_used: p.k_used,
-                        majority_count: p.majority_count,
-                        sum_used: p.sum_used,
-                        tiebreak: p.tiebreak
-                    };
-                });
-
-                this.results.forEach(result => {
-                    const coupleId = `${result.leaderBib}/${result.followerBib}`;
-                    const calcData = calcPlaceMap[coupleId];
-                    if (calcData) {
-                        result.calculatedPlace = calcData.place;
-
-                        const details = [];
-                        details.push(`k=${calcData.k_used}`);
-                        details.push(`maj=${calcData.majority_count}`);
-                        if (calcData.sum_used) {
-                            details.push(`sum=${calcData.sum_used}`);
-                        }
-                        if (calcData.tiebreak) {
-                            details.push(calcData.tiebreak);
-                        }
-                        result.calcDetails = details.join(', ');
-                    }
-                });
+                // Map calculated places with performance optimizations
+                mapCalculatedPlaces(this.results, rpssResult, this.hasModifications || force);
 
                 // Update audit trail
                 this.auditTrail = rpssResult.audit.steps;
@@ -627,6 +696,8 @@ document.addEventListener('alpine:init', () => {
             this.currentOrdinals = JSON.parse(JSON.stringify(this.originalOrdinals));
             this.modifiedCells.clear();
             this.hasModifications = false;
+            this.error = null; // Clear any validation errors
+            this.invalidJudges.clear(); // Clear invalid judge highlights
 
             // Recalculate with original data (force=true)
             await this.recalculate(true);
@@ -731,7 +802,7 @@ document.addEventListener('alpine:init', () => {
                     await new Promise(resolve => setTimeout(resolve, 50));
 
                     const rpssResult = calculateRPSS(this.results, this.judges);
-                    mapCalculatedPlaces(this.results, rpssResult);
+                    mapCalculatedPlaces(this.results, rpssResult, false);
 
                     // Store audit trail for step-by-step breakdown
                     this.auditTrail = rpssResult.audit.steps;
@@ -777,6 +848,9 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 this.successMessage = `Successfully loaded ${this.results.length} results!`;
+
+                // Save URL to localStorage for next visit
+                localStorage.setItem('wsdc_last_url', this.url);
 
                 // Auto-hide success message after 5 seconds
                 this.successTimeout = setTimeout(() => {

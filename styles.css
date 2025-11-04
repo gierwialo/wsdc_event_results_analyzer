@@ -233,6 +233,16 @@ button:disabled {
     animation: pulse 1.5s ease-in-out infinite;
 }
 
+.advanced-mode-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f59e0b;
+    background: #fff3cd;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid #f59e0b;
+}
+
 @keyframes pulse {
     0%, 100% {
         opacity: 1;
@@ -336,6 +346,17 @@ tbody tr:hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* Invalid judge column highlighting */
+.invalid-judge-column {
+    border: 3px solid var(--color-error) !important;
+    background: var(--color-error-bg) !important;
+}
+
+.invalid-judge-column .score-input {
+    background: var(--color-error-bg);
+    border-color: var(--color-error);
+}
+
 .bib {
     font-weight: 600;
     color: var(--color-primary);
@@ -411,16 +432,24 @@ tbody tr:hover {
     display: flex;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.button-group-actions {
+    display: flex;
+    gap: var(--spacing-md);
 }
 
 .btn-recalculate,
-.btn-reset {
+.btn-reset,
+.btn-advanced-mode {
     padding: var(--spacing-sm) var(--spacing-lg);
     font-size: 14px;
     font-weight: 600;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: background 0.2s, transform 0.1s, border-color 0.2s;
 }
 
 .btn-recalculate {
@@ -443,6 +472,97 @@ tbody tr:hover {
 .btn-reset:hover {
     background: var(--color-text);
     transform: translateY(-1px);
+}
+
+.btn-advanced-mode {
+    background: white;
+    color: #f59e0b;
+    border: 2px solid #f59e0b;
+}
+
+.btn-advanced-mode:hover {
+    background: #fffbeb;
+    transform: translateY(-1px);
+}
+
+.btn-advanced-mode.active {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.btn-advanced-mode.active:hover {
+    background: #d97706;
+}
+
+/* Info box for Advanced Mode explanation */
+.info-box {
+    background: #e0f2fe;
+    border-left: 4px solid #0ea5e9;
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.6;
+    animation: slideIn 0.3s ease-out;
+}
+
+.info-box strong {
+    color: #0369a1;
+}
+
+/* Footer disclaimer */
+.footer {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-xl);
+    text-align: center;
+}
+
+.footer-disclaimer {
+    background: transparent;
+    border: none;
+    padding: var(--spacing-lg);
+    color: white;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: var(--spacing-lg);
+}
+
+.footer-disclaimer strong {
+    color: white;
+}
+
+.footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    color: white;
+    font-size: 14px;
+}
+
+.footer-love {
+    font-size: 16px;
+    color: white;
+    font-weight: 500;
+}
+
+.footer-github,
+.footer-feedback {
+    margin: 0;
+    color: white;
+}
+
+.footer-links a {
+    color: white;
+    text-decoration: underline;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.footer-links a:hover {
+    opacity: 0.8;
 }
 
 /* Accessibility improvements */

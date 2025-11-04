@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WSDC Event Results Analyzer - Load, analyze, and verify dance competition results with RPSS algorithm verification and editable scores.">
     <title>WSDC Event Results Analyzer</title>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <main>
     <div class="container" x-data="resultsAnalyzer" x-cloak>
         <div class="card">
             <h1>📊 WSDC Event Results Analyzer</h1>
@@ -67,29 +69,59 @@
 
         <template x-if="results && !loading">
             <div class="card">
-                <div class="event-info" x-show="eventInfo">
-                <h2 x-text="eventInfo?.name"></h2>
-                <p><strong>Category:</strong> <span x-text="eventInfo?.category"></span></p>
-                <p><strong>Date:</strong> <span x-text="eventInfo?.date"></span></p>
-                <p><strong>Location:</strong> <span x-text="eventInfo?.location"></span></p>
-                <p class="judges-list"><strong>Judges:</strong> <span x-text="eventInfo?.judges"></span></p>
-                <p><strong>Scoring system:</strong> <span x-text="eventInfo?.calculationModel"></span></p>
-            </div>
+                <template x-if="eventInfo">
+                    <div class="event-info">
+                        <h2 x-text="eventInfo.name"></h2>
+                        <p><strong>Category:</strong> <span x-text="eventInfo.category"></span></p>
+                        <p><strong>Date:</strong> <span x-text="eventInfo.date"></span></p>
+                        <p><strong>Location:</strong> <span x-text="eventInfo.location"></span></p>
+                        <p class="judges-list"><strong>Judges:</strong> <span x-text="eventInfo.judges"></span></p>
+                        <p><strong>Scoring system:</strong> <span x-text="eventInfo.calculationModel"></span></p>
+                    </div>
+                </template>
 
             <h3 class="results-header">
                 Results (<span x-text="results?.length || 0"></span> couples)
                 <span x-show="calculatingRPSS" class="calculating-badge">
                     Calculating placements...
                 </span>
+                <span x-show="advancedMode" class="advanced-mode-badge">
+                    Advanced Mode
+                </span>
             </h3>
 
-            <div x-show="hasModifications" class="button-group">
-                <button @click="recalculate()" class="btn-recalculate">
-                    Recalculate
+            <div class="button-group">
+                <button
+                    @click="toggleAdvancedMode()"
+                    class="btn-advanced-mode"
+                    :class="{'active': advancedMode}"
+                    :aria-pressed="advancedMode"
+                    aria-label="Toggle advanced mode for manual score editing"
+                >
+                    <span x-show="!advancedMode">Enable Advanced Mode</span>
+                    <span x-show="advancedMode">Disable Advanced Mode</span>
                 </button>
-                <button @click="reset()" class="btn-reset">
-                    Reset
-                </button>
+                <div
+                    x-show="hasModifications"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 transform scale-95"
+                    x-transition:enter-end="opacity-100 transform scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="button-group-actions"
+                >
+                    <button @click="recalculate()" class="btn-recalculate">
+                        Recalculate
+                    </button>
+                    <button @click="reset()" class="btn-reset">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <div x-show="advancedMode" class="info-box">
+                <strong>ℹ️ Advanced Mode:</strong> Manual editing without automatic swapping. You can freely edit all values. Validation occurs only when you click "Recalculate" - each judge must assign unique placements from 1 to <span x-text="results?.length || 0"></span>.
             </div>
 
             <div class="table-wrapper">
@@ -102,14 +134,14 @@
                             <th scope="col">Bib</th>
                             <th scope="col">Leader</th>
                             <th scope="col">Follower</th>
-                            <template x-for="judge in judges" :key="judge">
-                                <th scope="col" class="judge-score" x-text="judge"></th>
+                            <template x-for="(judge, judgeIdx) in judges" :key="judge">
+                                <th scope="col" class="judge-score" :class="{ 'invalid-judge-column': isJudgeInvalid(judgeIdx) }" x-text="judge"></th>
                             </template>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="result in results" :key="`${result.leaderBib}-${result.followerBib}`">
-                            <tr :class="getRowClass(result)">
+                            <tr :class="result._rowClass">
                                 <td :class="{'grayed-out': hasModifications}">
                                     <span
                                         class="place"
@@ -121,12 +153,16 @@
                                     <div>
                                         <span
                                             class="calculated-place"
-                                            :class="getPlaceClass(result)"
-                                            :title="getPlaceTitle(result)"
+                                            :class="result._placeClass"
+                                            :title="result._placeTitle"
                                         >
                                             <span x-text="result.calculatedPlace || '?'"></span>
-                                            <span x-show="hasModifications && result.calculatedPlace < result.place" class="place-indicator">⬆️</span>
-                                            <span x-show="hasModifications && result.calculatedPlace > result.place" class="place-indicator">⬇️</span>
+                                            <template x-if="hasModifications">
+                                                <span>
+                                                    <span x-show="result.calculatedPlace < result.place" class="place-indicator">⬆️</span>
+                                                    <span x-show="result.calculatedPlace > result.place" class="place-indicator">⬇️</span>
+                                                </span>
+                                            </template>
                                         </span>
                                         <div class="calc-details" x-show="result.calcDetails">
                                             <span x-text="result.calcDetails"></span>
@@ -140,13 +176,14 @@
                                 <td x-text="result.leader"></td>
                                 <td x-text="result.follower"></td>
                                 <template x-for="(judge, judgeIdx) in judges" :key="judge">
-                                    <td class="judge-score" :class="{ 'modified-cell': isModified(judgeIdx, result.originalIndex) }">
+                                    <td class="judge-score" :class="{ 'modified-cell': isModified(judgeIdx, result.originalIndex), 'invalid-judge-column': isJudgeInvalid(judgeIdx) }">
                                         <input
                                             type="number"
                                             :value="getCurrentScore(judgeIdx, result.originalIndex)"
                                             @change="handleScoreChange(judgeIdx, result.originalIndex, $event)"
                                             min="1"
                                             :max="results.length"
+                                            :aria-label="`Score from ${judge} for ${result.leader} and ${result.follower}`"
                                             class="score-input"
                                         >
                                     </td>
@@ -293,6 +330,22 @@
             </div>
         </template>
     </div>
+    </main>
+
+    <footer class="footer">
+        <p class="footer-disclaimer">
+            <strong>⚠️ Disclaimer:</strong> While every effort has been made to ensure accuracy, the author is not responsible for the correctness of calculations after manual score modifications. Use the editing features at your own discretion. Always verify critical results against official scoring systems.
+        </p>
+        <div class="footer-links">
+            <p class="footer-love">with love to West❤️</p>
+            <p class="footer-github">
+                Code available on <a href="https://github.com/gierwialo/wsdc_event_results_analyzer" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </p>
+            <p class="footer-feedback">
+                Have an idea or feedback? <a href="https://github.com/gierwialo/wsdc_event_results_analyzer/issues" target="_blank" rel="noopener noreferrer">Report here</a>
+            </p>
+        </div>
+    </footer>
 
     <script src="app.js"></script>
 </body>
