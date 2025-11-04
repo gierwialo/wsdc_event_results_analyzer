@@ -25,22 +25,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Inject Analytics Code
-        if: secrets.ANALYTICS_CODE != ''
         env:
           ANALYTICS_CODE: ${{ secrets.ANALYTICS_CODE }}
         run: |
-          # Save analytics code to temp file
-          echo "$ANALYTICS_CODE" > analytics.tmp
+          # Only inject if ANALYTICS_CODE is not empty
+          if [ -n "$ANALYTICS_CODE" ]; then
+            # Save analytics code to temp file
+            echo "$ANALYTICS_CODE" > analytics.tmp
 
-          # Inject analytics code before Alpine.js script in <head>
-          awk '/<script defer src="https:\/\/cdn.jsdelivr.net\/npm\/alpinejs@3.x.x\/dist\/cdn.min.js"><\/script>/ {
-            while ((getline line < "analytics.tmp") > 0) print "    " line;
-            close("analytics.tmp")
-          }
-          {print}' index.html > index.tmp && mv index.tmp index.html
+            # Inject analytics code before Alpine.js script in <head>
+            awk '/<script defer src="https:\/\/cdn.jsdelivr.net\/npm\/alpinejs@3.x.x\/dist\/cdn.min.js"><\/script>/ {
+              while ((getline line < "analytics.tmp") > 0) print "    " line;
+              close("analytics.tmp")
+            }
+            {print}' index.html > index.tmp && mv index.tmp index.html
 
-          rm analytics.tmp
-          echo "Analytics code injected successfully"
+            rm analytics.tmp
+            echo "Analytics code injected successfully"
+          else
+            echo "No analytics code to inject (ANALYTICS_CODE secret not set)"
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
