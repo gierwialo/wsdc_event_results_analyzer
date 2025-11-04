@@ -14,6 +14,14 @@ const logger = {
     warn: (...args) => CONFIG.DEV_MODE && console.warn(...args)
 };
 
+// Analytics tracking helper
+const trackEvent = (eventName, params = {}) => {
+    if (typeof gtag !== 'undefined') {
+        gtag('event', eventName, params);
+        logger.log('Event tracked:', eventName, params);
+    }
+};
+
 const validateURL = (url) => {
     try {
         const urlObj = new URL(url);
@@ -546,6 +554,11 @@ document.addEventListener('alpine:init', () => {
             this.advancedMode = !this.advancedMode;
             this.error = null; // Clear any validation errors when switching modes
             this.invalidJudges.clear(); // Clear invalid judge highlights
+
+            // Track mode change
+            trackEvent('advanced_mode_toggle', {
+                enabled: this.advancedMode
+            });
         },
 
         // Handle score change with smart swap (or manual in advanced mode)
@@ -642,6 +655,13 @@ document.addEventListener('alpine:init', () => {
                         // Mark invalid judge columns
                         this.invalidJudges.clear();
                         validation.invalidJudges.forEach(j => this.invalidJudges.add(j));
+
+                        // Track validation error
+                        trackEvent('validation_error', {
+                            error_message: validation.message,
+                            invalid_judges_count: validation.invalidJudges.length
+                        });
+
                         return;
                     }
                     // Clear invalid judges on successful validation
@@ -680,6 +700,12 @@ document.addEventListener('alpine:init', () => {
                 // Sort results by calculated place for visual reordering
                 this.results.sort((a, b) => a.calculatedPlace - b.calculatedPlace);
 
+                // Track recalculation
+                trackEvent('recalculate', {
+                    advanced_mode: this.advancedMode,
+                    couples_count: this.results.length
+                });
+
             } catch (error) {
                 logger.error('Recalculation error:', error);
                 this.error = 'Error recalculating placements: ' + error.message;
@@ -704,6 +730,11 @@ document.addEventListener('alpine:init', () => {
 
             // Sort back to original order (by original place)
             this.results.sort((a, b) => a.place - b.place);
+
+            // Track reset
+            trackEvent('reset', {
+                couples_count: this.results.length
+            });
         },
 
         async loadResults() {
@@ -851,6 +882,14 @@ document.addEventListener('alpine:init', () => {
 
                 // Save URL to localStorage for next visit
                 localStorage.setItem('wsdc_last_url', this.url);
+
+                // Track event load
+                trackEvent('results_loaded', {
+                    event_name: this.eventInfo?.name || 'Unknown',
+                    event_category: this.eventInfo?.category || 'Unknown',
+                    couples_count: this.results.length,
+                    judges_count: this.judges.length
+                });
 
                 // Auto-hide success message after 5 seconds
                 this.successTimeout = setTimeout(() => {
