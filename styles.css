@@ -276,6 +276,36 @@ tbody tr:hover {
     background: var(--color-bg-light);
 }
 
+/* Row highlighting for improved/worsened placements */
+.row-improved {
+    background: #d4edda !important;
+    animation: slideInRow 0.5s ease-out;
+}
+
+.row-worsened {
+    background: #f8d7da !important;
+    animation: slideInRow 0.5s ease-out;
+}
+
+.row-improved:hover {
+    background: #c3e6cb !important;
+}
+
+.row-worsened:hover {
+    background: #f5c6cb !important;
+}
+
+@keyframes slideInRow {
+    from {
+        opacity: 0.5;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 .place {
     font-weight: 700;
     color: var(--color-primary);
@@ -284,6 +314,22 @@ tbody tr:hover {
 .place-1 { color: var(--color-gold); }
 .place-2 { color: var(--color-silver); }
 .place-3 { color: var(--color-bronze); }
+
+/* Grayed out column (for Place after recalculation) */
+.grayed-out {
+    opacity: 0.4;
+    color: var(--color-text-muted) !important;
+}
+
+.grayed-out .place {
+    color: var(--color-text-muted) !important;
+}
+
+.grayed-out.place-1,
+.grayed-out.place-2,
+.grayed-out.place-3 {
+    color: var(--color-text-muted) !important;
+}
 
 .judge-score {
     text-align: center;
@@ -310,10 +356,93 @@ tbody tr:hover {
     border-radius: var(--radius-sm);
 }
 
+.place-improved {
+    color: var(--color-success);
+    font-weight: 700;
+}
+
+.place-worsened {
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+.place-indicator {
+    margin-left: 4px;
+    font-size: 14px;
+}
+
 .calc-details {
     font-size: 11px;
     color: var(--color-text-muted);
     margin-top: 2px;
+}
+
+/* Editable scores styles */
+.score-input {
+    width: 50px;
+    padding: var(--spacing-xs);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.score-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background: var(--color-bg-light);
+}
+
+.modified-cell {
+    background: #fff3cd;
+    border: 3px solid #f59e0b !important;
+}
+
+.modified-cell .score-input {
+    background: #fff3cd;
+    border-color: #f59e0b;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.button-group {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.btn-recalculate,
+.btn-reset {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-recalculate {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+}
+
+.btn-recalculate:hover {
+    background: var(--color-primary-dark);
+    transform: translateY(-1px);
+}
+
+.btn-reset {
+    background: var(--color-text-muted);
+    color: white;
+    border: none;
+}
+
+.btn-reset:hover {
+    background: var(--color-text);
+    transform: translateY(-1px);
 }
 
 /* Accessibility improvements */
@@ -602,6 +731,11 @@ tbody tr:hover {
     .spinner {
         animation: none;
         border-top-color: var(--color-primary);
+    }
+
+    .row-improved,
+    .row-worsened {
+        animation: none;
     }
 }
 

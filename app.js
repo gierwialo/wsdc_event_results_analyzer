@@ -368,7 +368,7 @@ const parseEventData = (eventData, judgesSet) => {
 };
 
 const parseResults = (eventData) => {
-    return eventData.result.map(result => {
+    return eventData.result.map((result, index) => {
         const scores = {};
         if (result.scores) {
             result.scores.forEach(score => {
@@ -382,7 +382,8 @@ const parseResults = (eventData) => {
             leaderBib: result.dancer?.leader?.bib || '',
             follower: result.dancer?.follower?.fullname || '',
             followerBib: result.dancer?.follower?.bib || '',
-            scores: scores
+            scores: scores,
+            originalIndex: index  // Track original position for ordinals mapping
         };
     });
 };
@@ -391,14 +392,17 @@ const calculateRPSS = (results, judges) => {
     const C = results.length;
     const J = judges.length;
 
-    const couple_ids = results.map(r => `${r.leaderBib}/${r.followerBib}`);
+    // Sort by originalIndex to maintain consistent couple_ids order
+    const sortedByOriginal = [...results].sort((a, b) => a.originalIndex - b.originalIndex);
+
+    const couple_ids = sortedByOriginal.map(r => `${r.leaderBib}/${r.followerBib}`);
     const ordinals = [];
 
     for (let j = 0; j < J; j++) {
         const judgeName = judges[j];
         const judgeOrdinals = [];
         for (let c = 0; c < C; c++) {
-            const placement = parseInt(results[c].scores[judgeName]);
+            const placement = parseInt(sortedByOriginal[c].scores[judgeName]);
             if (isNaN(placement)) {
                 throw new Error(`Invalid placement for judge ${judgeName}, couple ${c}`);
             }
@@ -464,14 +468,171 @@ document.addEventListener('alpine:init', () => {
         auditInfo: null,
         calculatingRPSS: false,
 
+        // Editable scores state
+        originalOrdinals: null,      // Backup of original ordinals [judge][couple]
+        currentOrdinals: null,       // Current (possibly modified) ordinals [judge][couple]
+        modifiedCells: new Set(),    // Track which cells are modified "judgeIdx-coupleIdx"
+        hasModifications: false,     // Flag if any modifications exist
+
         // Computed property for place matching class
         getPlaceClass(result) {
+            if (!result.calculatedPlace) return '';
+
+            // If modifications exist, compare with original place
+            if (this.hasModifications) {
+                if (result.calculatedPlace < result.place) return 'place-improved';
+                if (result.calculatedPlace > result.place) return 'place-worsened';
+            }
+
             return result.calculatedPlace === result.place ? 'place-match' : 'place-mismatch';
         },
 
         // Computed property for place match title
         getPlaceTitle(result) {
+            if (!result.calculatedPlace) return '';
+
+            if (this.hasModifications) {
+                if (result.calculatedPlace < result.place) return 'Improved (moved up)';
+                if (result.calculatedPlace > result.place) return 'Worsened (moved down)';
+            }
+
             return result.calculatedPlace === result.place ? 'Match' : 'Mismatch';
+        },
+
+        // Check if cell is modified
+        isModified(judgeIdx, coupleIdx) {
+            return this.modifiedCells.has(`${judgeIdx}-${coupleIdx}`);
+        },
+
+        // Get row class for highlighting
+        getRowClass(result) {
+            if (!this.hasModifications) return '';
+            if (result.calculatedPlace < result.place) return 'row-improved';
+            if (result.calculatedPlace > result.place) return 'row-worsened';
+            return '';
+        },
+
+        // Get current score for judge and couple
+        getCurrentScore(judgeIdx, coupleIdx) {
+            if (!this.currentOrdinals) return '-';
+            return this.currentOrdinals[judgeIdx]?.[coupleIdx] || '-';
+        },
+
+        // Handle score change with smart swap
+        handleScoreChange(judgeIdx, coupleIdx, event) {
+            const newValue = parseInt(event.target.value);
+            const oldValue = this.currentOrdinals[judgeIdx][coupleIdx];
+
+            if (isNaN(newValue) || newValue === oldValue) return;
+
+            // Find couple that currently has newValue
+            const swapCoupleIdx = this.currentOrdinals[judgeIdx].findIndex(
+                (score, idx) => score === newValue && idx !== coupleIdx
+            );
+
+            if (swapCoupleIdx !== -1) {
+                // Swap: current couple gets newValue, other gets oldValue
+                this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
+                this.currentOrdinals[judgeIdx][swapCoupleIdx] = oldValue;
+
+                // Mark both as modified
+                this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
+                this.modifiedCells.add(`${judgeIdx}-${swapCoupleIdx}`);
+            } else {
+                // Just update (shouldn't happen with proper validation)
+                this.currentOrdinals[judgeIdx][coupleIdx] = newValue;
+                this.modifiedCells.add(`${judgeIdx}-${coupleIdx}`);
+            }
+
+            this.hasModifications = true;
+        },
+
+        // Recalculate RPSS with current ordinals
+        async recalculate(force = false) {
+            if (!force && !this.hasModifications) return;
+
+            try {
+                this.calculatingRPSS = true;
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Build couple_ids from results in original order (by originalIndex)
+                const couple_ids = [];
+                const sortedByOriginal = [...this.results].sort((a, b) => a.originalIndex - b.originalIndex);
+                sortedByOriginal.forEach(r => {
+                    couple_ids.push(`${r.leaderBib}/${r.followerBib}`);
+                });
+
+                // Call RPSS with current ordinals
+                const rpssResult = compute_relative_placement(
+                    this.currentOrdinals,
+                    couple_ids,
+                    this.judges
+                );
+
+                // Map new calculated places
+                const calcPlaceMap = {};
+                rpssResult.placements.forEach(p => {
+                    calcPlaceMap[p.couple_id] = {
+                        place: p.place,
+                        k_used: p.k_used,
+                        majority_count: p.majority_count,
+                        sum_used: p.sum_used,
+                        tiebreak: p.tiebreak
+                    };
+                });
+
+                this.results.forEach(result => {
+                    const coupleId = `${result.leaderBib}/${result.followerBib}`;
+                    const calcData = calcPlaceMap[coupleId];
+                    if (calcData) {
+                        result.calculatedPlace = calcData.place;
+
+                        const details = [];
+                        details.push(`k=${calcData.k_used}`);
+                        details.push(`maj=${calcData.majority_count}`);
+                        if (calcData.sum_used) {
+                            details.push(`sum=${calcData.sum_used}`);
+                        }
+                        if (calcData.tiebreak) {
+                            details.push(calcData.tiebreak);
+                        }
+                        result.calcDetails = details.join(', ');
+                    }
+                });
+
+                // Update audit trail
+                this.auditTrail = rpssResult.audit.steps;
+                this.auditInfo = {
+                    majority: rpssResult.audit.majority,
+                    totalJudges: rpssResult.audit.totalJudges,
+                    totalCouples: rpssResult.audit.totalCouples
+                };
+
+                // Sort results by calculated place for visual reordering
+                this.results.sort((a, b) => a.calculatedPlace - b.calculatedPlace);
+
+            } catch (error) {
+                logger.error('Recalculation error:', error);
+                this.error = 'Error recalculating placements: ' + error.message;
+            } finally {
+                this.calculatingRPSS = false;
+            }
+        },
+
+        // Reset to original values
+        async reset() {
+            if (!this.originalOrdinals) return;
+
+            // Deep copy original ordinals
+            this.currentOrdinals = JSON.parse(JSON.stringify(this.originalOrdinals));
+            this.modifiedCells.clear();
+            this.hasModifications = false;
+
+            // Recalculate with original data (force=true)
+            await this.recalculate(true);
+
+            // Sort back to original order (by original place)
+            this.results.sort((a, b) => a.place - b.place);
         },
 
         async loadResults() {
@@ -579,6 +740,30 @@ document.addEventListener('alpine:init', () => {
                         totalJudges: rpssResult.audit.totalJudges,
                         totalCouples: rpssResult.audit.totalCouples
                     };
+
+                    // Initialize ordinals for editable scores
+                    const C = this.results.length;
+                    const J = this.judges.length;
+                    const ordinals = [];
+
+                    for (let j = 0; j < J; j++) {
+                        const judgeName = this.judges[j];
+                        const judgeOrdinals = new Array(C);
+
+                        // Use originalIndex to maintain consistent mapping
+                        this.results.forEach(result => {
+                            const placement = parseInt(result.scores[judgeName]);
+                            judgeOrdinals[result.originalIndex] = placement;
+                        });
+
+                        ordinals.push(judgeOrdinals);
+                    }
+
+                    // Store original and current ordinals
+                    this.originalOrdinals = JSON.parse(JSON.stringify(ordinals));
+                    this.currentOrdinals = JSON.parse(JSON.stringify(ordinals));
+                    this.modifiedCells.clear();
+                    this.hasModifications = false;
                 } catch (rpssError) {
                     logger.error('RPSS calculation error:', rpssError);
                     this.results.forEach(result => {

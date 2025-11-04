@@ -83,12 +83,21 @@
                 </span>
             </h3>
 
+            <div x-show="hasModifications" class="button-group">
+                <button @click="recalculate()" class="btn-recalculate">
+                    Recalculate
+                </button>
+                <button @click="reset()" class="btn-reset">
+                    Reset
+                </button>
+            </div>
+
             <div class="table-wrapper">
                 <table>
                     <caption class="visually-hidden">Competition results with judge scores and calculated placements</caption>
                     <thead>
                         <tr>
-                            <th scope="col">Place</th>
+                            <th scope="col" :class="{'grayed-out': hasModifications}">Place</th>
                             <th scope="col">Calc Place</th>
                             <th scope="col">Bib</th>
                             <th scope="col">Leader</th>
@@ -100,8 +109,8 @@
                     </thead>
                     <tbody>
                         <template x-for="result in results" :key="`${result.leaderBib}-${result.followerBib}`">
-                            <tr>
-                                <td>
+                            <tr :class="getRowClass(result)">
+                                <td :class="{'grayed-out': hasModifications}">
                                     <span
                                         class="place"
                                         :class="'place-' + result.place"
@@ -113,9 +122,12 @@
                                         <span
                                             class="calculated-place"
                                             :class="getPlaceClass(result)"
-                                            x-text="result.calculatedPlace || '?'"
                                             :title="getPlaceTitle(result)"
-                                        ></span>
+                                        >
+                                            <span x-text="result.calculatedPlace || '?'"></span>
+                                            <span x-show="hasModifications && result.calculatedPlace < result.place" class="place-indicator">⬆️</span>
+                                            <span x-show="hasModifications && result.calculatedPlace > result.place" class="place-indicator">⬇️</span>
+                                        </span>
                                         <div class="calc-details" x-show="result.calcDetails">
                                             <span x-text="result.calcDetails"></span>
                                         </div>
@@ -127,8 +139,17 @@
                                 </td>
                                 <td x-text="result.leader"></td>
                                 <td x-text="result.follower"></td>
-                                <template x-for="judge in judges" :key="judge">
-                                    <td class="judge-score" x-text="result.scores?.[judge] || '-'"></td>
+                                <template x-for="(judge, judgeIdx) in judges" :key="judge">
+                                    <td class="judge-score" :class="{ 'modified-cell': isModified(judgeIdx, result.originalIndex) }">
+                                        <input
+                                            type="number"
+                                            :value="getCurrentScore(judgeIdx, result.originalIndex)"
+                                            @change="handleScoreChange(judgeIdx, result.originalIndex, $event)"
+                                            min="1"
+                                            :max="results.length"
+                                            class="score-input"
+                                        >
+                                    </td>
                                 </template>
                             </tr>
                         </template>
