@@ -278,6 +278,188 @@
             border: 0;
         }
 
+        /* Audit trail styles */
+        .audit-subtitle {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .audit-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            background: var(--color-bg-light);
+        }
+
+        .audit-step {
+            display: flex;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
+            background: white;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--color-border);
+        }
+
+        .audit-step-init {
+            border-left-color: var(--color-primary);
+            background: #f0f4ff;
+        }
+
+        .audit-step-iteration {
+            border-left-color: var(--color-text-muted);
+        }
+
+        .audit-step-check {
+            border-left-color: #e2e8f0;
+        }
+
+        .audit-step-tie {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .audit-step-assign {
+            border-left-color: var(--color-success);
+            background: #f0fdf4;
+            font-weight: 500;
+        }
+
+        .audit-step-number {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-bg-light);
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+        }
+
+        .audit-step-content {
+            flex: 1;
+        }
+
+        .audit-step-message {
+            color: var(--color-text);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.5;
+        }
+
+        .audit-step-meta {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        .audit-meta-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--color-bg-light);
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            color: var(--color-text-muted);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Legend styles */
+        .legend-container {
+            margin-top: var(--spacing-xl);
+            padding: var(--spacing-lg);
+            background: white;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--color-border);
+        }
+
+        .legend-title {
+            color: var(--color-text);
+            font-size: 18px;
+            margin-bottom: var(--spacing-lg);
+            border-bottom: 2px solid var(--color-border);
+            padding-bottom: var(--spacing-sm);
+        }
+
+        .legend-section {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .legend-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .legend-section-title {
+            color: var(--color-text);
+            font-size: 14px;
+            margin-bottom: var(--spacing-md);
+            font-weight: 600;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            color: var(--color-text-light);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: var(--radius-sm);
+            flex-shrink: 0;
+            border: 2px solid var(--color-border);
+        }
+
+        .legend-color-init {
+            background: #f0f4ff;
+            border-color: var(--color-primary);
+        }
+
+        .legend-color-iteration {
+            background: white;
+            border-color: var(--color-text-muted);
+        }
+
+        .legend-color-check {
+            background: white;
+            border-color: #e2e8f0;
+        }
+
+        .legend-color-tie {
+            background: #fffbeb;
+            border-color: #f59e0b;
+        }
+
+        .legend-color-assign {
+            background: #f0fdf4;
+            border-color: var(--color-success);
+        }
+
+        .legend-description {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .legend-description p {
+            color: var(--color-text-light);
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             body {
@@ -294,6 +476,15 @@
 
             button {
                 width: 100%;
+            }
+
+            .audit-container {
+                max-height: 400px;
+            }
+
+            .audit-step {
+                flex-direction: column;
+                gap: var(--spacing-sm);
             }
         }
     </style>
@@ -399,6 +590,101 @@
                         </template>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Step-by-step breakdown -->
+        <div x-show="auditTrail && !loading" class="card">
+            <h3 class="results-header">
+                📋 Step-by-Step Calculation Breakdown
+            </h3>
+            <p class="subtitle audit-subtitle">
+                Follow how the RPSS algorithm determines each placement, step by step.
+            </p>
+
+            <div class="audit-container">
+                <template x-for="step in auditTrail" :key="step.step">
+                    <div class="audit-step" :class="'audit-step-' + step.type">
+                        <div class="audit-step-number">
+                            <span x-text="step.step"></span>
+                        </div>
+                        <div class="audit-step-content">
+                            <div class="audit-step-message" x-text="step.message"></div>
+                            <div x-show="step.k" class="audit-step-meta">
+                                <span class="audit-meta-badge">k = <span x-text="step.k"></span></span>
+                                <span x-show="step.majorityCount" class="audit-meta-badge">
+                                    Majority: <span x-text="step.majorityCount"></span>/<span x-text="auditInfo?.totalJudges"></span>
+                                </span>
+                                <span x-show="step.sum" class="audit-meta-badge">
+                                    Sum: <span x-text="step.sum"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend-container">
+                <h4 class="legend-title">📖 Legend & Terminology</h4>
+
+                <div class="legend-section">
+                    <h5 class="legend-section-title">Step Types (Colors)</h5>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <span class="legend-color legend-color-init"></span>
+                            <strong>Init</strong> - Algorithm initialization
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color-iteration"></span>
+                            <strong>Iteration</strong> - Starting new place calculation
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color-check"></span>
+                            <strong>Check</strong> - Checking couples at level k
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color-tie"></span>
+                            <strong>Tie</strong> - Multiple couples tied, need tie-break
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color-assign"></span>
+                            <strong>Assign</strong> - Place successfully assigned to couple
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <h5 class="legend-section-title">Key Terms</h5>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <strong>k</strong> - Current placement level being checked (e.g., k=2 means checking how many judges placed couple in top 2)
+                        </div>
+                        <div class="legend-item">
+                            <strong>Majority</strong> - Minimum number of judges needed (>50%) to determine a placement. Formula: floor(J/2) + 1
+                        </div>
+                        <div class="legend-item">
+                            <strong>maj</strong> - How many judges gave this couple a placement ≤ k (e.g., maj=5/7 means 5 out of 7 judges)
+                        </div>
+                        <div class="legend-item">
+                            <strong>Sum</strong> - Sum of ordinal placements ≤ k, used to break ties (lower is better)
+                        </div>
+                        <div class="legend-item">
+                            <strong>Ordinals</strong> - Individual judge placements (rankings) for each couple
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <h5 class="legend-section-title">How RPSS Works</h5>
+                    <div class="legend-description">
+                        <p><strong>1. Majority Rule:</strong> A couple gets a placement when a majority of judges (>50%) rank them at that level or better.</p>
+                        <p><strong>2. Level-by-level:</strong> Start at k=1 (1st place), then k=2 (top 2), k=3 (top 3), etc., until someone has majority.</p>
+                        <p><strong>3. Tie-breaking:</strong> If multiple couples have the same majority count, use sum of their ordinals ≤ k (lower sum wins).</p>
+                        <p><strong>4. Expand k:</strong> If still tied after sum, expand to k+1, k+2, etc., and compare majority counts at higher levels.</p>
+                        <p><strong>5. Head-to-head:</strong> Final tie-breaker for 2 couples: count which couple is ranked higher by more judges.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -513,18 +799,40 @@
 
             const majority = Math.floor(J / 2) + 1;
             const placements = [];
-            const audit = { majority, steps: [] };
+            const audit = { majority, steps: [], totalJudges: J, totalCouples: C };
             const remaining = new Set([...Array(C).keys()]);
             let place = 1;
             let iteration = 0;
+            let stepNumber = 1;
+
+            audit.steps.push({
+                step: stepNumber++,
+                type: 'init',
+                message: `Starting RPSS calculation with ${J} judges and ${C} couples. Majority = ${majority}`
+            });
 
             while (remaining.size > 0 && iteration < CONFIG.MAX_RPSS_ITERATIONS) {
                 iteration++;
                 let k = 1;
                 let assigned_at_this_level = false;
 
+                audit.steps.push({
+                    step: stepNumber++,
+                    type: 'iteration',
+                    message: `Starting iteration for place ${place}. Remaining couples: ${Array.from(remaining).map(c => couple_ids[c]).join(', ')}`
+                });
+
                 while (k <= C) {
                     const { counts, eligible } = findMajorityWinners(remaining, ordinals, k, majority);
+
+                    audit.steps.push({
+                        step: stepNumber++,
+                        type: 'check',
+                        k: k,
+                        counts: {...counts},
+                        eligible: eligible.map(c => couple_ids[c]),
+                        message: `Checking k=${k}: ${eligible.length > 0 ? `${eligible.length} couple(s) have majority` : 'No couples have majority yet'}`
+                    });
 
                     if (eligible.length === 0) {
                         k++;
@@ -536,6 +844,15 @@
 
                     if (tier.length === 1) {
                         const c = tier[0];
+                        audit.steps.push({
+                            step: stepNumber++,
+                            type: 'assign',
+                            place: place,
+                            couple: couple_ids[c],
+                            k: k,
+                            majorityCount: maxCount,
+                            message: `✓ Assigned place ${place} to ${couple_ids[c]} (majority: ${maxCount}/${J} at k≤${k})`
+                        });
                         placements.push({
                             place: place++,
                             couple_id: couple_ids[c],
@@ -559,12 +876,37 @@
                         }
                     } else {
                         // Tie-break
+                        audit.steps.push({
+                            step: stepNumber++,
+                            type: 'tie',
+                            couples: tier.map(c => couple_ids[c]),
+                            message: `⚠ Tie between ${tier.length} couples: ${tier.map(c => couple_ids[c]).join(', ')}. Using sum of ordinals ≤${k} to break tie.`
+                        });
+
                         const sums = calculateSums(tier, ordinals, k);
                         const bestSum = Math.min(...tier.map(c => sums[c]));
                         const tied2 = tier.filter(c => sums[c] === bestSum);
 
+                        const sumsInfo = tier.map(c => `${couple_ids[c]}: sum=${sums[c]}`).join(', ');
+                        audit.steps.push({
+                            step: stepNumber++,
+                            type: 'tie-sums',
+                            sums: Object.fromEntries(tier.map(c => [couple_ids[c], sums[c]])),
+                            message: `Ordinal sums at k≤${k}: ${sumsInfo}`
+                        });
+
                         if (tied2.length === 1) {
                             const c = tied2[0];
+                            audit.steps.push({
+                                step: stepNumber++,
+                                type: 'assign',
+                                place: place,
+                                couple: couple_ids[c],
+                                k: k,
+                                majorityCount: maxCount,
+                                sum: sums[c],
+                                message: `✓ Assigned place ${place} to ${couple_ids[c]} (sum: ${sums[c]}, best among tied)`
+                            });
                             placements.push({
                                 place: place++,
                                 couple_id: couple_ids[c],
@@ -810,6 +1152,8 @@
                 eventInfo: null,
                 judges: [],
                 successTimeout: null,
+                auditTrail: null,
+                auditInfo: null,
 
                 async loadResults() {
                     if (!this.url) return;
@@ -832,6 +1176,8 @@
                     this.loading = true;
                     this.results = null;
                     this.eventInfo = null;
+                    this.auditTrail = null;
+                    this.auditInfo = null;
 
                     logger.log('Starting to load results from:', this.url);
 
@@ -901,12 +1247,22 @@
                             logger.log('Starting RPSS calculation...');
                             const rpssResult = calculateRPSS(this.results, this.judges);
                             mapCalculatedPlaces(this.results, rpssResult);
+
+                            // Store audit trail for step-by-step breakdown
+                            this.auditTrail = rpssResult.audit.steps;
+                            this.auditInfo = {
+                                majority: rpssResult.audit.majority,
+                                totalJudges: rpssResult.audit.totalJudges,
+                                totalCouples: rpssResult.audit.totalCouples
+                            };
                         } catch (rpssError) {
                             logger.error('RPSS calculation error:', rpssError);
                             this.results.forEach(result => {
                                 result.calculatedPlace = 'ERR';
                                 result.calcDetails = 'Calculation error';
                             });
+                            this.auditTrail = null;
+                            this.auditInfo = null;
                         }
 
                         this.successMessage = `Successfully loaded ${this.results.length} results!`;
