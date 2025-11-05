@@ -377,6 +377,26 @@ const compute_relative_placement = (ordinals, couple_ids, judge_ids) => {
     return { placements, audit };
 };
 
+// Validation function to check if results are from finals
+const validateIsFinal = (eventData) => {
+    // Check round.name first (most precise), then category/division as fallback
+    const roundName = eventData.round?.name || '';
+    const category = eventData.category || '';
+    const division = eventData.division || '';
+
+    const textToCheck = `${roundName} ${category} ${division}`.toLowerCase();
+
+    if (textToCheck.includes('semi') || textToCheck.includes('prelim')) {
+        throw new Error(
+            'This page contains semifinal or preliminary results, not finals. ' +
+            'This tool only supports analyzing final round results with complete judge scorecards. ' +
+            'Please provide a link to the finals results page.'
+        );
+    }
+
+    return true;
+};
+
 // Data parsing functions
 const parseEventData = (eventData, judgesSet) => {
     const locationParts = [];
@@ -811,20 +831,33 @@ document.addEventListener('alpine:init', () => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
 
-                // Look for JSON-LD with results
+                // Look for JSON-LD with event data
                 const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
                 let eventData = null;
+                let eventDataForValidation = null;
 
                 scripts.forEach(script => {
                     try {
                         const data = JSON.parse(script.textContent);
+
+                        // Find Event with results for processing
                         if (data['@type'] === 'Event' && data.result && Array.isArray(data.result)) {
                             eventData = data;
+                        }
+
+                        // Find any Event or DanceEvent for validation (may not have results)
+                        if (!eventDataForValidation && (data['@type'] === 'Event' || data['@type'] === 'DanceEvent')) {
+                            eventDataForValidation = data;
                         }
                     } catch (e) {
                         logger.error('Error parsing JSON-LD:', e);
                     }
                 });
+
+                // Validate that this is a finals page (before checking for results)
+                if (eventDataForValidation) {
+                    validateIsFinal(eventDataForValidation);
+                }
 
                 if (!eventData || !eventData.result || eventData.result.length === 0) {
                     throw new Error('No results data found on the page. Please ensure this is a valid results page.');
