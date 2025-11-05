@@ -13,7 +13,7 @@
     <div class="container" x-data="resultsAnalyzer" x-cloak>
         <div class="card">
             <h1>📊 WSDC Event Results Analyzer</h1>
-            <p class="subtitle">Paste a link to results from scoring.dance</p>
+            <p class="subtitle">Paste a link to a scoring.dance results page.</p>
 
             <div class="input-group">
                 <input
@@ -63,7 +63,7 @@
         <div x-show="loading" class="card" aria-live="polite" aria-busy="true">
             <div class="loading">
                 <div class="spinner" role="status" aria-label="Loading results"></div>
-                <p>Fetching data from scoring.dance...</p>
+                <p>Loading data from scoring.dance…</p>
             </div>
         </div>
 
@@ -121,12 +121,12 @@
             </div>
 
             <div x-show="advancedMode" class="info-box">
-                <strong>ℹ️ Advanced Mode:</strong> Manual editing without automatic swapping. You can freely edit all values. Validation occurs only when you click "Recalculate" - each judge must assign unique placements from 1 to <span x-text="results?.length || 0"></span>.
+                <strong>ℹ️ Advanced Mode:</strong> Advanced mode lets you edit all values with no auto-swapping. Validation runs only when you click 'Recalculate'. Each judge must assign unique placements from 1 to <span x-text="results?.length || 0"></span>.
             </div>
 
             <div class="table-wrapper">
                 <table>
-                    <caption class="visually-hidden">Competition results with judge scores and calculated placements</caption>
+                    <caption class="visually-hidden">Competition results with judges' scores and calculated placements.</caption>
                     <thead>
                         <tr>
                             <th scope="col" :class="{'grayed-out': hasModifications}">Place</th>
@@ -203,7 +203,7 @@
                 📋 Step-by-Step Calculation Breakdown
             </h3>
             <p class="subtitle audit-subtitle">
-                Follow how the RPSS algorithm determines each placement, step by step.
+                See how the RPSS algorithm determines each placement, step by step.
             </p>
 
             <div class="audit-container">
@@ -286,7 +286,7 @@
                         <p><strong>2. Level-by-level:</strong> Start at k=1 (1st place), then k=2 (top 2), k=3 (top 3), etc., until someone has majority.</p>
                         <p><strong>3. Tie-breaking:</strong> If multiple couples have the same majority count, use sum of their ordinals ≤ k (lower sum wins).</p>
                         <p><strong>4. Expand k:</strong> If still tied after sum, expand to k+1, k+2, etc., and compare majority counts at higher levels.</p>
-                        <p><strong>5. Head-to-head:</strong> Final tie-breaker for 2 couples: count which couple is ranked higher by more judges.</p>
+                        <p><strong>5. Head-to-head (two couples):</strong> the couple ranked higher by more judges wins.</p>
                     </div>
                 </div>
             </div>
@@ -334,7 +334,7 @@
 
     <footer class="footer">
         <p class="footer-disclaimer">
-            <strong>⚠️ Disclaimer:</strong> While every effort has been made to ensure accuracy, the author is not responsible for the correctness of calculations after manual score modifications. Use the editing features at your own discretion. Always verify critical results against official scoring systems.
+            <strong>⚠️ Disclaimer:</strong> While we strive for accuracy, we cannot guarantee results after manual edits. Use the editing features at your own discretion and verify critical results against official scoring systems.
         </p>
         <div class="footer-links">
             <p class="footer-love">with love to West❤️</p>

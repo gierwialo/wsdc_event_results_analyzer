@@ -4,6 +4,7 @@ const CONFIG = {
     SUCCESS_MESSAGE_TIMEOUT: 5000,
     ALLOWED_DOMAIN: 'scoring.dance',
     CORS_PROXY_URL: 'https://api.allorigins.win/raw?url=',
+    USE_CORS_PROXY_DEFAULT: false, // Default setting for CORS proxy usage
     DEV_MODE: false // Set to true to enable console logging
 };
 
@@ -38,6 +39,22 @@ const sanitizeHTML = (str) => {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+};
+
+// Format ordinal numbers (1st, 2nd, 3rd, 4th, etc.)
+const formatOrdinal = (num) => {
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const lastDigit = num % 10;
+    const lastTwoDigits = num % 100;
+
+    // Special case for 11th, 12th, 13th
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+        return num + 'th';
+    }
+
+    // Use appropriate suffix based on last digit
+    const suffix = suffixes[lastDigit] || suffixes[0];
+    return num + suffix;
 };
 
 // RPSS Algorithm - Validation
@@ -132,10 +149,11 @@ const compute_relative_placement = (ordinals, couple_ids, judge_ids) => {
         let k = 1;
         let assigned_at_this_level = false;
 
+        const couplesList = Array.from(remaining).map(c => couple_ids[c]).join(', ');
         audit.steps.push({
             step: stepNumber++,
             type: 'iteration',
-            message: `Starting iteration for place ${place}. Remaining couples: ${Array.from(remaining).map(c => couple_ids[c]).join(', ')}`
+            message: `Starting ${formatOrdinal(place)}-place check. Checking if any couple achieves a majority of judges. Couples under consideration (${remaining.size}): ${couplesList}`
         });
 
         while (k <= C) {
@@ -167,7 +185,7 @@ const compute_relative_placement = (ordinals, couple_ids, judge_ids) => {
                     couple: couple_ids[c],
                     k: k,
                     majorityCount: maxCount,
-                    message: `✓ Assigned place ${place} to ${couple_ids[c]} (majority: ${maxCount}/${J} at k≤${k})`
+                    message: `✓ Assigned ${formatOrdinal(place)} place to ${couple_ids[c]} (majority: ${maxCount}/${J} at k≤${k})`
                 });
                 placements.push({
                     place: place++,
@@ -196,7 +214,7 @@ const compute_relative_placement = (ordinals, couple_ids, judge_ids) => {
                     step: stepNumber++,
                     type: 'tie',
                     couples: tier.map(c => couple_ids[c]),
-                    message: `⚠ Tie between ${tier.length} couples: ${tier.map(c => couple_ids[c]).join(', ')}. Using sum of ordinals ≤${k} to break tie.`
+                    message: `⚠ Tie between ${tier.length} couples: ${tier.map(c => couple_ids[c]).join(', ')}. Tiebreak: compare sums of ordinals ≤${k}`
                 });
 
                 const sums = calculateSums(tier, ordinals, k);
@@ -221,7 +239,7 @@ const compute_relative_placement = (ordinals, couple_ids, judge_ids) => {
                         k: k,
                         majorityCount: maxCount,
                         sum: sums[c],
-                        message: `✓ Assigned place ${place} to ${couple_ids[c]} (sum: ${sums[c]}, best among tied)`
+                        message: `✓ Assigned ${formatOrdinal(place)} place to ${couple_ids[c]} (sum: ${sums[c]}, best among tied)`
                     });
                     placements.push({
                         place: place++,
@@ -524,6 +542,7 @@ document.addEventListener('alpine:init', () => {
         auditTrail: null,
         auditInfo: null,
         calculatingRPSS: false,
+        useCorsProxy: CONFIG.USE_CORS_PROXY_DEFAULT, // Option to use CORS proxy
 
         // Editable scores state
         originalOrdinals: null,      // Backup of original ordinals [judge][couple]
@@ -766,23 +785,26 @@ document.addEventListener('alpine:init', () => {
             try {
                 // Fetch data
                 let html;
-                try {
-                    logger.log('Fetching directly...');
+
+                if (this.useCorsProxy) {
+                    // Use CORS proxy directly if enabled
+                    logger.log('Using CORS proxy (user enabled)...');
+                    const proxyUrl = `${CONFIG.CORS_PROXY_URL}${encodeURIComponent(this.url)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) {
+                        throw new Error('Unable to fetch data via proxy. Please check the URL or try again later.');
+                    }
+                    html = await response.text();
+                    logger.log('Proxy fetch successful');
+                } else {
+                    // Try direct fetch only (no fallback to proxy)
+                    logger.log('Fetching directly (CORS proxy disabled)...');
                     const response = await fetch(this.url);
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     html = await response.text();
                     logger.log('Direct fetch successful');
-                } catch (corsError) {
-                    logger.log('Direct fetch failed, using proxy...');
-                    const proxyUrl = `${CONFIG.CORS_PROXY_URL}${encodeURIComponent(this.url)}`;
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) {
-                        throw new Error('Unable to fetch data. Please check the URL or try again later.');
-                    }
-                    html = await response.text();
-                    logger.log('Proxy fetch successful');
                 }
 
                 // Parse HTML
